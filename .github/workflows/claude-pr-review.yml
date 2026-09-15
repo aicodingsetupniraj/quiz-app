@@ -54,8 +54,8 @@ jobs:
         continue-on-error: true
         run: |
           npm install -g @anthropic-ai/claude-code
-          claude plugin marketplace add @REPLACE-ME-OWNER/@REPLACE-ME-REPO || true
-          claude plugin install agentic-coding-setup@@REPLACE-ME-REPO --scope user -y || true
+          claude plugin marketplace add aicodingsetupniraj/agentic-coding-work-flows || true
+          claude plugin install agentic-coding-setup@agentic-coding-work-flows --scope user -y || true
 
       - uses: anthropics/claude-code-action@v1
         with:
