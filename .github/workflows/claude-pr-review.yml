@@ -33,8 +33,13 @@ jobs:
     # But not on every push to a draft - that is work in progress, and re-reviewing each
     # commit burns the budget on code the author is still changing. So: on open, and again
     # when it is marked ready.
+    #
+    # Not Dependabot: its runs get Dependabot secrets, not Actions secrets, so the API key
+    # is empty and the job can only fail. Dependency PRs are covered by the Security
+    # workflow's CVE scan and the dependency-auditor agent.
     if: >-
       github.event.pull_request.head.repo.full_name == github.repository &&
+      github.actor != 'dependabot[bot]' &&
       (github.event.action != 'synchronize' || github.event.pull_request.draft == false)
     runs-on: ubuntu-latest
     timeout-minutes: 20
@@ -54,8 +59,8 @@ jobs:
         continue-on-error: true
         run: |
           npm install -g @anthropic-ai/claude-code
-          claude plugin marketplace add @REPLACE-ME-OWNER/@REPLACE-ME-REPO || true
-          claude plugin install agentic-coding-setup@@REPLACE-ME-REPO --scope user -y || true
+          claude plugin marketplace add aicodingsetupniraj/agentic-coding-work-flows || true
+          claude plugin install agentic-coding-setup@agentic-coding-work-flows --scope user -y || true
 
       - uses: anthropics/claude-code-action@v1
         with:

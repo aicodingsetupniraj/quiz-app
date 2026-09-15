@@ -105,12 +105,14 @@ jobs:
       # Recursive, so this works whatever the stack ships - package-lock.json, uv.lock,
       # go.sum, Cargo.lock, pom.xml. A hardcoded lockfile path silently scans nothing the
       # day the project is not the language it started as.
+      #
+      # No --skip-git: osv-scanner v2 removed the flag (the job exits 127 on it), and
+      # skipping the git root is already the default - --include-git-root opts back in.
       - name: OSV-Scanner
         uses: google/osv-scanner-action/osv-scanner-action@v2.5.1
         with:
           scan-args: |-
             --recursive
-            --skip-git
             ./
 
       - name: Trivy filesystem

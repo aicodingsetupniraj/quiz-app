@@ -37,7 +37,11 @@ concurrency:
 
 jobs:
   security-review:
-    if: github.event.pull_request.head.repo.full_name == github.repository
+    # Not Dependabot: its runs get Dependabot secrets, not Actions secrets, so the API key
+    # is empty and the job can only fail. The Security workflow still scans those PRs.
+    if: >-
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      github.actor != 'dependabot[bot]'
     runs-on: ubuntu-latest
     timeout-minutes: 25
     steps:
