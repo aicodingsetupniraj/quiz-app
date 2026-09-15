@@ -1,7 +1,7 @@
 ---
 id: "001"
 title: A kid sees all six science topics on the home page
-status: todo
+status: done
 milestone: M1
 requirements: [R-5.1.1, R-5.1.2, R-5.1.4, R-5.1.5, R-5.1.6, R-5.5.1, R-4.3, R-4.5, R-6.3, R-6.4, D-version, D-topics, D-quizConfig]
 depends_on: []
@@ -33,13 +33,13 @@ slice also puts the typed content module and both test runners in place.
 
 *Authored by the planner; the PRD has no criteria for this slice.*
 
-- [ ] `npm test` runs Vitest and `npm run test:e2e` runs Playwright against a production build (ADR-0003)
-- [ ] A typed content module exposes topics, questions, `quizConfig` and badges from the content file, imported at build time with no `fetch` (Vitest)
-- [ ] A Vitest test checks the content: every topic has exactly `questionsPerTopic` questions, each with 4 distinct options, a valid `correctIndex`, and an explanation, and no two question IDs repeat. A broken content edit fails CI.
-- [ ] `/` shows 6 topic cards, each with icon, title, short description and difficulty label (Playwright)
-- [ ] Each card links to `/topics/<id>` (Playwright)
-- [ ] The grid shows no horizontal scroll at 375px, 768px and 1280px wide (Playwright viewports)
-- [ ] `next build` reports `/` as static (○)
+- [x] `npm test` runs Vitest and `npm run test:e2e` runs Playwright against a production build (ADR-0003)
+- [x] A typed content module exposes topics, questions, `quizConfig` and badges from the content file, imported at build time with no `fetch` (Vitest)
+- [x] A Vitest test checks the content: every topic has exactly `questionsPerTopic` questions, each with 4 distinct options, a valid `correctIndex`, and an explanation, and no two question IDs repeat. A broken content edit fails CI.
+- [x] `/` shows 6 topic cards, each with icon, title, short description and difficulty label (Playwright)
+- [x] Each card links to `/topics/<id>` (Playwright)
+- [x] The grid shows no horizontal scroll at 375px, 768px and 1280px wide (Playwright viewports)
+- [x] `next build` reports `/` as static (○)
 
 ## Notes
 

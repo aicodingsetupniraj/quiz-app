@@ -21,7 +21,8 @@ device. The requirements are in `docs/kids-science-prd.md`; the content is
 - **Language:** TypeScript, `strict`, `@/*` → `src/*`
 - **Framework:** Next.js 16 (App Router, `src/app/`), React 19, Tailwind CSS v4
 - **Database:** none, by design. Content is bundled JSON; progress is `localStorage`
-- **Tests:** <NOT CHOSEN YET - no test runner is installed. Decide in the first plan slice>
+- **Tests:** Vitest for logic (`src/**/*.test.ts`), Playwright + axe for pages (`e2e/`,
+  against a production build) - ADR-0003
 - **Deploy:** Vercel via its GitHub integration (not GitHub Actions). The Actions deploy
   workflows are deliberate TODOs until that is wired
 
@@ -33,11 +34,14 @@ npm run dev            # local development
 npm run build          # production build (also typechecks)
 npx tsc --noEmit       # types only
 npm run lint           # eslint
+npm test               # Vitest, once (not watch)
+npm test -- src/content/content.test.ts   # a single test file
+npm run test:e2e       # Playwright: builds, starts on :3100, runs e2e/
 bash security/check-code.sh --list   # the code rules in force
 ```
 
-There is no `test`, `typecheck`, or `test:e2e` script yet. CI runs them with `--if-present`,
-so adding the script is what turns the check on.
+First e2e run on a machine: `npx playwright install chromium`. There is no `typecheck`
+script yet. CI runs `npm test` but not `test:e2e` - that job needs its own config PR.
 
 ## Architecture
 
