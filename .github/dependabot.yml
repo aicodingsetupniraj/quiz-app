@@ -35,3 +35,17 @@ updates:
         update-types: ["minor", "patch"]
     commit-message:
       prefix: "deps"
+    # Majors the toolchain cannot take yet. Each one failed CI on its own PR.
+    # Remove the entry when the blocker named next to it is gone.
+    ignore:
+      # eslint 10: eslint-plugin-react (via eslint-config-next 16.3) crashes on load -
+      # "contextOrFilename.getFilename is not a function".
+      - dependency-name: "eslint"
+        update-types: ["version-update:semver-major"]
+      # typescript 7: typescript-eslint (via eslint-config-next) refuses to load -
+      # "typescript-eslint does not support TS 7.0".
+      - dependency-name: "typescript"
+        update-types: ["version-update:semver-major"]
+      # @types/node tracks the runtime in .nvmrc (Node 24), not the newest Node.
+      - dependency-name: "@types/node"
+        versions: [">=25"]

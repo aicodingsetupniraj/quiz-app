@@ -8,9 +8,10 @@
 
 name: Deploy staging
 
+# Manual only until the deploy step is real. This project deploys through Vercel's GitHub
+# integration, so on every push to main this workflow could only reach its `exit 1` TODO
+# and mark main red. Restore the push trigger when the Deploy step does real work.
 on:
-  push:
-    branches: [main]
   workflow_dispatch:
 
 permissions:
