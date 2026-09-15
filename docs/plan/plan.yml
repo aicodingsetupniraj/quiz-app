@@ -1,0 +1,39 @@
+generated: 2026-09-15
+mode: local              # local | hybrid | issues - set by /plan-sync and /plan-handoff
+stack:                   # Changing this invalidates the slices, not just estimates.
+  name: next
+  detected: true         # read from package.json; chosen from the PRD by /new-project
+  version: next 16.3.5, react 19, typescript 5, tailwind 4
+  runtime: node 24       # .nvmrc - set the same in Vercel
+  decided_by: adr-0002
+  rule_packs: [core, nextjs, react, node]
+  test_runner: vitest + playwright (+ @axe-core/playwright)   # adr-0003
+  carries:               # what this choice settled that the documents did not mention
+    - no server code - no route handlers, server actions, middleware, or runtime fetches
+    - persistence - localStorage only, one module, versioned and migrated (adr-0002)
+    - hosting - Vercel via its GitHub integration; Actions deploy workflows stay manual
+    - auth - none; no personal data, including no child's name
+    - ci - the e2e job needs its own config PR on .github/workflows/ci.yml (adr-0003)
+sources:
+  - path: docs/kids-science-prd.md
+    sha256: 07628749ebfaf78e4a50193e4a1a8c6e730a1870f48d1d526f5885662f6c5927
+  - path: docs/topics-data.json
+    sha256: 78b51e2909635cd2365c3e09cc2ac98304f6d04b27ad25946fe88427236eac3e
+decisions:               # blocking questions answered before slicing - see OPEN-QUESTIONS.md
+  - C-1 + G-4: streak counts visits; device local date; missed day resets to 1
+  - C-3 + G-1: not started / in progress (started, none finished) / completed (any finished quiz)
+  - G-2: attempt counts only on reaching the summary; mid-quiz leave or refresh restarts
+  - G-3: stars 0-2 -> 1, 3-4 -> 2, 5 -> 3
+milestones:
+  - id: M1
+    title: A kid can take a quiz on any topic, live on Vercel
+    slices: ["001", "002", "003", "004", "005"]
+  - id: M2
+    title: Progress is remembered between visits
+    slices: ["006", "007", "008"]
+  - id: M3
+    title: Streaks and badges keep kids coming back
+    slices: ["009", "010"]
+  - id: M4
+    title: Accessible everywhere, plus the optional pieces
+    slices: ["011", "012", "013"]
