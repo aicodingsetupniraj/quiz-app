@@ -8,7 +8,7 @@ depends_on: ["005", "008", "010"]
 risk: normal
 estimate: 2d
 blocked_by_question:
-issue:
+issue: 22
 ---
 
 ## Goal

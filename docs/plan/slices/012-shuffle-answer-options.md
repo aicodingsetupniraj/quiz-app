@@ -8,7 +8,7 @@ depends_on: ["003"]
 risk: normal
 estimate: 1d
 blocked_by_question: C-2
-issue:
+issue: 15
 ---
 
 ## Goal

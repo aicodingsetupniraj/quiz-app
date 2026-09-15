@@ -8,7 +8,7 @@ depends_on: ["004"]
 risk: high
 estimate: 3d
 blocked_by_question:
-issue:
+issue: 17
 ---
 
 ## Goal

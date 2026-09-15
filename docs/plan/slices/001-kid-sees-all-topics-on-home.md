@@ -8,7 +8,7 @@ depends_on: []
 risk: normal
 estimate: 2d
 blocked_by_question:
-issue:
+issue: 11
 ---
 
 ## Goal

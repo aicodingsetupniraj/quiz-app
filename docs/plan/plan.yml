@@ -1,5 +1,5 @@
 generated: 2026-09-15
-mode: local              # local | hybrid | issues - set by /plan-sync and /plan-handoff
+mode: hybrid              # local | hybrid | issues - set by /plan-sync and /plan-handoff
 stack:                   # Changing this invalidates the slices, not just estimates.
   name: next
   detected: true         # read from package.json; chosen from the PRD by /new-project
