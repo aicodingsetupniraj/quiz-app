@@ -65,7 +65,9 @@ jobs:
       - uses: anthropics/claude-code-action@v1
         with:
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
-          claude_args: "--max-turns 20"
+          # 20 ran out on a PR with a lockfile diff (#9): reading CLAUDE.md, the rules that
+          # apply, and the changed files takes most of that before any review starts.
+          claude_args: "--max-turns 40"
           prompt: |
             Review the diff on this pull request. You are advisory - you comment, a human
             decides. Nothing you say blocks the merge.
