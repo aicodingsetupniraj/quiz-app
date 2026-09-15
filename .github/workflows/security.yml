@@ -1,0 +1,188 @@
+# The blocking scan set. Every PR.
+#
+# The 10-minute rule: if this takes longer than that, people route around it, and a gate
+# people route around is not a gate. When it grows, move the slowest non-critical job to
+# security-nightly.yml. Do not make it non-blocking to save time - that is the same as
+# dropping it, with paperwork.
+#
+# NOTE: pin every action to a commit SHA before relying on this.
+
+name: Security
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: security-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # Any finding blocks. There is no severity ladder for a committed credential - it is
+  # compromised the moment it lands, and it has to be rotated.
+  secrets:
+    name: Secret scanning
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    # gitleaks-action lists the PR's commits on a pull_request event; without this it
+    # 403s and the job fails without having scanned anything.
+    permissions:
+      contents: read
+      pull-requests: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # The same rules the agent hits while writing, run again on what actually arrived.
+  # This job is the enforcement point: the PreToolUse hook is fast feedback and can be
+  # bypassed by a broken install or a machine without the plugin, and neither of those
+  # may decide what lands on main.
+  #
+  # Scoped to lines this PR adds. A pre-existing finding is a backlog item, not a
+  # reason nobody can merge - run `security/check-code.sh --file <path>` to sweep those
+  # deliberately.
+  code-rules:
+    name: Stack code rules
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Which rules are in force
+        run: bash security/check-code.sh --list
+
+      - name: Check the lines this PR adds
+        # `github.base_ref` is a branch name an attacker controls on a fork PR. It goes
+        # through `env:` so the runner never expands it as shell. On a push it is empty,
+        # and the default lands in the shell, not in the expansion.
+        env:
+          BASE_REF: ${{ github.base_ref }}
+        run: |
+          BASE="${BASE_REF:-main}"
+          git fetch --no-tags --depth=1 origin "$BASE" || true
+          bash security/check-code.sh --diff "origin/$BASE"
+
+  sast:
+    name: SAST
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    container:
+      image: semgrep/semgrep
+    steps:
+      - uses: actions/checkout@v4
+      - name: Semgrep
+        # Registry rulesets for breadth, .semgrep.yml for the rules this codebase
+        # learned the hard way. Blocks on ERROR.
+        run: |
+          semgrep scan \
+            --config=p/default \
+            --config=p/security-audit \
+            --config=p/secrets \
+            --config=p/owasp-top-ten \
+            --config=.semgrep.yml \
+            --severity=ERROR \
+            --error \
+            --metrics=off
+
+  # Without a base image, essentially the entire CVE surface is the lockfile.
+  dependencies:
+    name: Dependency CVEs
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      # Recursive, so this works whatever the stack ships - package-lock.json, uv.lock,
+      # go.sum, Cargo.lock, pom.xml. A hardcoded lockfile path silently scans nothing the
+      # day the project is not the language it started as.
+      - name: OSV-Scanner
+        uses: google/osv-scanner-action/osv-scanner-action@v2.5.1
+        with:
+          scan-args: |-
+            --recursive
+            --skip-git
+            ./
+
+      - name: Trivy filesystem
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          scan-type: fs
+          scan-ref: .
+          severity: HIGH,CRITICAL
+          exit-code: "1"
+          ignore-unfixed: true
+          trivyignores: .trivyignore
+
+  iac:
+    name: IaC scanning
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Skip if there is no infra yet
+        id: check
+        run: |
+          if [ -d infra ] && find infra -name '*.tf' -o -name '*.yaml' | grep -q .; then
+            echo "found=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "found=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Checkov
+        if: steps.check.outputs.found == 'true'
+        uses: bridgecrewio/checkov-action@v12
+        with:
+          directory: infra
+          soft_fail: false
+
+      - name: Trivy config
+        if: steps.check.outputs.found == 'true'
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          scan-type: config
+          scan-ref: infra
+          severity: HIGH,CRITICAL
+          exit-code: "1"
+
+  # The suite that matters most. A failure here is a vulnerability until proven
+  # otherwise - never flaky-until-proven-otherwise.
+  authz:
+    name: Authorization tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Skip if the suite does not exist yet
+        id: check
+        run: |
+          if find e2e/authz -type f \( -name '*.spec.*' -o -name '*.test.*' \) 2>/dev/null | grep -q .; then
+            echo "found=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "found=false" >> "$GITHUB_OUTPUT"
+            echo "::warning::No authz suite found. This is the gate that matters most - see the authz-test skill."
+          fi
+
+      - uses: actions/setup-node@v4
+        if: steps.check.outputs.found == 'true'
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Run the authz suite
+        if: steps.check.outputs.found == 'true'
+        run: |
+          npm ci
+          npx playwright install --with-deps chromium
+          npx playwright test e2e/authz

@@ -1,0 +1,77 @@
+# build - typecheck - lint - test
+#
+# The floor. Everything else assumes this is green.
+#
+# NOTE: actions are referenced by tag here for readability. Pin each to a full commit
+# SHA before relying on this in a repository that matters - a tag can be moved, a SHA
+# cannot. See .claude/rules/infra.md.
+
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      # --frozen-lockfile everywhere. An install allowed to resolve differently in CI
+      # than it did locally makes the committed lockfile decorative, and the lockfile
+      # is the whole CVE surface without a container image.
+      - name: Install
+        run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck --if-present
+
+      - name: Lint
+        run: npm run lint --if-present
+
+      - name: Test
+        run: npm test --if-present
+
+      - name: Build
+        run: npm run build --if-present
+
+  # An unexplained lockfile change is a review item, not a nit: a lockfile diff with no
+  # manifest change means something resolved differently than expected, which is exactly
+  # what registry substitution looks like.
+  lockfile-review:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Flag a lockfile change with no manifest change
+        # `github.base_ref` is a branch name an attacker controls on a fork PR. It goes
+        # through `env:` so the runner never expands it as shell.
+        env:
+          BASE_REF: ${{ github.base_ref }}
+        run: |
+          git fetch --no-tags --depth=1 origin "$BASE_REF"
+          CHANGED="$(git diff --name-only "origin/$BASE_REF"...HEAD)"
+          LOCK="$(printf '%s\n' "$CHANGED" | grep -E '(package-lock\.json|pnpm-lock\.yaml|yarn\.lock)$' || true)"
+          MANIFEST="$(printf '%s\n' "$CHANGED" | grep -E 'package\.json$' || true)"
+          if [ -n "$LOCK" ] && [ -z "$MANIFEST" ]; then
+            echo "::warning::Lockfile changed with no package.json change. Explain the diff in the PR - see .claude/rules/dependencies.md"
+          fi

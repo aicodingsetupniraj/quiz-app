@@ -1,0 +1,114 @@
+# Slow scans, plus DAST against staging.
+#
+# Everything here is too slow for the PR gate. Pushed to nightly rather than dropped -
+# the alternative to a nightly scan is no scan.
+#
+# Non-blocking by design: this reports, it does not gate a merge. What it finds goes
+# through the triage-finding skill like any other finding.
+
+name: Security nightly
+
+on:
+  schedule:
+    - cron: "0 3 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  security-events: write
+  # Documented as required for CodeQL on a private repository.
+  actions: read
+
+jobs:
+  codeql:
+    name: CodeQL
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        language: [javascript-typescript]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: github/codeql-action/init@v3
+        with:
+          language: ${{ matrix.language }}
+          queries: security-extended
+      - uses: github/codeql-action/autobuild@v3
+      - uses: github/codeql-action/analyze@v3
+
+  sbom:
+    name: SBOM
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Generate CycloneDX SBOM
+        uses: anchore/sbom-action@v0
+        with:
+          format: cyclonedx-json
+          artifact-name: sbom.cyclonedx.json
+      # An artifact, not a gate. It matters the day a customer or an auditor asks.
+      - uses: actions/upload-artifact@v4
+        with:
+          name: sbom
+          path: /tmp/sbom.cyclonedx.json
+          retention-days: 90
+
+  licenses:
+    name: License review
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Syft inventory
+        uses: anchore/sbom-action@v0
+        with:
+          format: spdx-json
+          output-file: licenses.spdx.json
+      - name: Flag copyleft licences
+        run: |
+          # Review, not block. A GPL dependency is a legal question, not a build failure.
+          if grep -oE '"licenseConcluded"\s*:\s*"[^"]*(GPL|AGPL|SSPL)[^"]*"' licenses.spdx.json | sort -u | grep -q .; then
+            echo "::warning::Copyleft-licensed dependencies present - review before release"
+            grep -oE '"licenseConcluded"\s*:\s*"[^"]*(GPL|AGPL|SSPL)[^"]*"' licenses.spdx.json | sort -u
+          fi
+
+  dast:
+    name: DAST against staging
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    # Requires STAGING_URL. Never point this at production: a scanner submits forms,
+    # follows destructive links, and will happily exercise anything it can reach.
+    if: vars.STAGING_URL != ''
+    steps:
+      - uses: actions/checkout@v4
+      - name: OWASP ZAP baseline
+        uses: zaproxy/action-baseline@v0.12.0
+        with:
+          target: ${{ vars.STAGING_URL }}
+          cmd_options: "-a -j"
+          fail_action: false
+
+  waivers:
+    name: Expiring waivers
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Report expired suppressions
+        run: |
+          # A suppression file with no dates is just the list of vulnerabilities you
+          # have agreed to live with forever. This is what stops that happening quietly.
+          TODAY="$(date -u +%Y-%m-%d)"
+          EXPIRED=0
+          if [ -d security/suppressions ]; then
+            while read -r date; do
+              [ -z "$date" ] && continue
+              if [ "$date" \< "$TODAY" ]; then
+                echo "::warning::Waiver expired on $date - it needs a decision, not a renewal"
+                EXPIRED=$((EXPIRED + 1))
+              fi
+            done < <(grep -rhoE 'expires:[[:space:]]*[0-9]{4}-[0-9]{2}-[0-9]{2}' security/suppressions 2>/dev/null | grep -oE '[0-9]{4}-[0-9]{2}-[0-9]{2}')
+          fi
+          echo "Expired waivers: $EXPIRED"

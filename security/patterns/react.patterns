@@ -1,0 +1,38 @@
+# React. Rules: .claude/rules/react.md
+
+id: REACT-PUBLIC-SECRET
+severity: block
+files: \.(js|jsx|ts|tsx|mjs|cjs|env|local)$|\.env
+match: (NEXT_PUBLIC|VITE|REACT_APP|PUBLIC|GATSBY)_[A-Z0-9_]*(SECRET|PRIVATE|PASSWORD|API_?KEY|TOKEN|CREDENTIAL)
+why: A client-prefixed variable is compiled into the bundle and is public by definition. Read this on the server and pass down only what the view needs. See .claude/rules/react.md.
+
+id: REACT-DANGEROUS-HTML-VAR
+severity: block
+files: \.(jsx|tsx)$
+match: __html:[[:space:]]*[a-zA-Z_$]
+unless: (DOMPurify|sanitize|Sanitize|SANITIZE)
+why: dangerouslySetInnerHTML with a variable is XSS unless the value was sanitized against an allowlist first. See .claude/rules/react.md.
+
+id: REACT-JAVASCRIPT-URI
+severity: block
+files: \.(js|jsx|ts|tsx)$
+match: (href|src|action)[[:space:]]*=[[:space:]]*["'{]*[[:space:]]*['"]?javascript:
+why: A javascript: URI in an href executes on click. Validate the scheme against an allowlist. See .claude/rules/react.md.
+
+id: REACT-TOKEN-IN-STORAGE
+severity: warn
+files: \.(js|jsx|ts|tsx)$
+match: (localStorage|sessionStorage)\.setItem\([^)]*(token|jwt|secret|password|api_?key)
+why: Anything in web storage is readable by any XSS on the origin. Prefer an HttpOnly cookie. See .claude/rules/react.md.
+
+id: REACT-INDEX-AS-KEY
+severity: warn
+files: \.(jsx|tsx)$
+match: key=\{[[:space:]]*(i|idx|index)[[:space:]]*\}
+why: An index key on a list that reorders, filters, or deletes hands one row's state to another. Key by identity. See .claude/rules/react.md.
+
+id: REACT-EFFECT-NO-CLEANUP-FETCH
+severity: warn
+files: \.(jsx|tsx)$
+match: useEffect\([^)]*fetch\(
+why: A fetch in an effect needs an AbortController and a cleanup return, or an unmount mid-flight sets state on nothing. See .claude/rules/react.md.

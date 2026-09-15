@@ -1,0 +1,84 @@
+# Production - GitHub environment gate plus a required reviewer.
+#
+# The environment gate is the enforcement point, and it is configured in the repository
+# settings, NOT here: Settings > Environments > production > Required reviewers. Without
+# that, this workflow deploys automatically and the gate below is decoration.
+#
+# THE DEPLOY STEP IS A TODO - the platform differs per project.
+
+name: Deploy production
+
+on:
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: The tag or SHA to deploy. Must already be on staging.
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment:
+      name: production
+      url: ${{ vars.PRODUCTION_URL }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref }}
+
+      - name: Confirm CI passed for this exact ref
+        run: |
+          # Deploying a ref whose CI never ran, or never passed, is the failure this
+          # step exists to prevent.
+          CONCLUSION="$(gh run list --commit "$(git rev-parse HEAD)" --workflow CI \
+            --limit 1 --json conclusion --jq '.[0].conclusion // "missing"')"
+          if [ "$CONCLUSION" != "success" ]; then
+            echo "CI for this ref is '$CONCLUSION', not success. Refusing to deploy."
+            exit 1
+          fi
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Install
+        run: npm ci
+
+      - name: Build
+        run: npm run build --if-present
+
+      # Migrations run here, through the pipeline, behind the environment gate - never
+      # from a laptop and never from an agent session. See the db-migration skill.
+      - name: Migrate
+        run: |
+          echo "TODO: run migrations for this platform, or delete this step."
+          echo "Expand/migrate/contract - this deploy must be safe alongside the old code."
+
+      - name: Deploy
+        run: |
+          echo "TODO: replace with the real deploy for this platform."
+          exit 1
+
+      - name: Smoke check
+        run: |
+          test -n "${{ vars.PRODUCTION_URL }}" || exit 0
+          curl --fail --silent --show-error --max-time 30 "${{ vars.PRODUCTION_URL }}" > /dev/null
+
+      # Every deploy is revertible, and the revert path has been run at least once. An
+      # untested rollback is a plan you are trusting during the worst hour of the quarter.
+      - name: Rollback instructions
+        if: failure()
+        run: |
+          echo "Deploy failed. Roll back by re-running this workflow with the previous tag."

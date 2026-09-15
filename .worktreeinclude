@@ -1,0 +1,26 @@
+# Files copied into a new git worktree.
+#
+# Worktrees are how parallel agent sessions run without colliding on one working tree.
+# They start from a clean checkout, so anything gitignored is missing - which usually
+# means the app does not start and the session wastes its first ten minutes on that.
+#
+# Local secrets ARE included here. That is the point: a worktree is on the same machine,
+# under the same user, as the checkout it came from. Nothing here should ever be a
+# production credential - see .claude/rules/infra.md.
+
+.env
+.env.local
+.env.development.local
+.env.test.local
+
+# Personal, gitignored notes and overrides
+CLAUDE.local.md
+.claude/settings.local.json
+.claude/hooks.env
+
+# Editor and tooling state worth keeping
+.vscode/settings.json
+.idea/
+
+# Expensive to rebuild, safe to share between worktrees
+.certificates/

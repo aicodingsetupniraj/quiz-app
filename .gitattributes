@@ -1,0 +1,4 @@
+# Shell scripts run under bash on Windows (hooks, pre-commit) and Linux (CI).
+# A CRLF checkout breaks them, so they stay LF everywhere.
+*.sh text eol=lf
+*.patterns text eol=lf

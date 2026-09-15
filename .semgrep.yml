@@ -1,0 +1,83 @@
+# Semgrep - SAST. Blocks on high.
+#
+# Registry rulesets carry the breadth. The rules below are the ones this codebase
+# learned the hard way - each should trace back to a real review comment or a real
+# incident. A local rule with no story behind it is noise you will later ignore.
+
+rules:
+  - id: fetch-then-check-authorization
+    languages: [typescript, javascript]
+    severity: WARNING
+    message: >-
+      Possible fetch-then-check authorization. This finds a record by ID and compares
+      ownership afterwards. Scope the query by the caller instead - filter on orgId or
+      userId in the where clause - so another tenant's row cannot be returned at all.
+      Fetch-then-check leaks through error messages, through timing, and through every
+      future caller that forgets the check.
+    patterns:
+      - pattern-either:
+          - pattern: |
+              $DOC = await $DB.$MODEL.findUnique({ where: { id: $ID } })
+              ...
+              if ($DOC.$OWNER !== $SESSION.$FIELD) { ... }
+          - pattern: |
+              $DOC = await $DB.$MODEL.findById($ID)
+              ...
+              if ($DOC.$OWNER !== $SESSION.$FIELD) { ... }
+
+  - id: server-action-without-session
+    languages: [typescript]
+    severity: ERROR
+    message: >-
+      A server action is a public HTTP endpoint - anyone can invoke it with any
+      arguments, and the component that calls it is not a control. Authenticate first,
+      then validate the input against a schema, then authorize the specific resource.
+    patterns:
+      - pattern-inside: |
+          "use server";
+          ...
+      - pattern: |
+          export async function $FN(...) { ... }
+      - pattern-not: |
+          export async function $FN(...) {
+            ...
+            await $AUTH(...)
+            ...
+          }
+
+  - id: spread-into-database-write
+    languages: [typescript, javascript]
+    severity: ERROR
+    message: >-
+      Request data spread directly into a write. Any field the schema happens to permit
+      becomes a field the caller can write, including ones added to the model later.
+      Allowlist the fields explicitly.
+    patterns:
+      - pattern-either:
+          - pattern: '$DB.$MODEL.update({ ..., data: { ...$INPUT } })'
+          - pattern: '$DB.$MODEL.create({ ..., data: { ...$INPUT } })'
+
+  - id: public-env-var-holding-secret
+    languages: [typescript, javascript]
+    severity: ERROR
+    message: >-
+      A NEXT_PUBLIC_ variable is compiled into the browser bundle and is readable by
+      anyone. This name suggests it holds a secret. Prefixing a secret to silence an
+      error publishes it; read it on the server instead.
+    pattern-regex: 'NEXT_PUBLIC_[A-Z0-9_]*(SECRET|PRIVATE|TOKEN|PASSWORD|CREDENTIAL)[A-Z0-9_]*'
+
+  - id: string-built-sql
+    languages: [typescript, javascript, python, go]
+    severity: ERROR
+    message: >-
+      SQL assembled from a variable. Use a parameterized query. Where an identifier must
+      genuinely be dynamic, allowlist it against a fixed set.
+    pattern-regex: '(?i)(select|insert into|update|delete from)\s+[^\n;]*(\$\{|\+\s*[a-zA-Z_]|%s\s*%|\bformat\()'
+
+  - id: disabled-tls-verification
+    languages: [typescript, javascript, python, go]
+    severity: ERROR
+    message: >-
+      TLS verification disabled. This turns a secure connection into an unauthenticated
+      one. If a certificate is failing, fix the certificate.
+    pattern-regex: '(rejectUnauthorized\s*:\s*false|verify\s*=\s*False|InsecureSkipVerify\s*:\s*true|NODE_TLS_REJECT_UNAUTHORIZED\s*=\s*.?0)'

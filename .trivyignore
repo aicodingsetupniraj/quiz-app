@@ -1,0 +1,21 @@
+# Trivy - filesystem and IaC scanning.
+#
+# No containers in this stack, so image and base-layer scanning do not apply. What is
+# left is dependency CVEs and infrastructure misconfiguration, and dependencies are
+# essentially the whole CVE surface without a base image.
+#
+# EVERY LINE HERE NEEDS A DATE AND AN OWNER, in this shape:
+#
+#   # CVE-2024-12345
+#   # reason : vulnerable path not reachable - CLI entry point is unused here
+#   # owner  : @REPLACE-ME
+#   # expires: 2026-01-15
+#   # ticket : PROJ-482
+#   CVE-2024-12345
+#
+# An undated line is not an accepted risk; it is an unreviewed one. /waivers reports
+# anything here that is missing a field or past its date.
+#
+# Keep the mirror entry in security/suppressions/ so there is one place to sweep.
+
+# (no active suppressions)

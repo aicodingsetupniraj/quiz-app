@@ -1,0 +1,117 @@
+# Core patterns - every stack, every file.
+#
+# Format: blank-line separated blocks of `key: value`. There is no field delimiter on
+# purpose - every delimiter a pattern file could use is a character some regex needs.
+#
+#   id        stable, unique across every pattern file. It appears in the denial.
+#   severity  block | warn. `block` denies the write and fails CI. Keep it small and
+#             certain: a false positive here teaches people to disable the gate.
+#   files     ERE matched against the path. A rule with no `files` matches every file.
+#   exclude   ERE matched against the path; skips the rule when it matches.
+#   match     ERE matched against the line.
+#   unless    ERE that, when the line also matches, suppresses the finding.
+#   why       one line: what is wrong, what to do instead, and the rule file to read.
+#
+# Adding a `block` rule means every project on the next /sync-setup starts failing on
+# it. That is the intent - but the pattern has to be right, so pair it with a test in
+# tests/gates.sh in the same PR.
+
+id: CORE-PRIVATE-KEY
+severity: block
+files: \.(js|jsx|ts|tsx|mjs|cjs|py|go|rs|cs|java|rb|php|sh|yml|yaml|tf|json)$
+match: -----BEGIN [A-Z ]*PRIVATE KEY-----
+why: A private key in the tree is compromised the moment it lands - it goes in the secret manager, and this one now needs rotating. See security/policy.md.
+
+id: CORE-URL-CREDENTIALS
+severity: block
+files: \.(js|jsx|ts|tsx|mjs|cjs|py|go|rs|cs|java|rb|php|sh|yml|yaml|tf)$
+match: [a-z]+://[A-Za-z0-9._%+-]+:[^@/[:space:]"']+@
+unless: (localhost|127\.0\.0\.1|example\.com|user:pass|USER:PASS|\$\{|\$[A-Z_]+|<[A-Za-z-]+>)
+why: Credentials inline in a URL. Read them from the environment and build the URL at runtime. See .claude/rules/security.md.
+
+id: CORE-TLS-VERIFY-OFF
+severity: block
+files: \.(sh|yml|yaml|Dockerfile)$|Dockerfile
+match: curl[^|;]*(--insecure|[[:space:]]-k[[:space:]])
+why: Downloading over TLS with verification disabled is downloading over HTTP with extra steps. Fix the CA bundle instead. See .claude/rules/security.md.
+
+id: CORE-INLINE-SUPPRESSION
+severity: warn
+files: \.(js|jsx|ts|tsx|mjs|cjs|py|go|rs|cs|java|rb|php)$
+match: (nosec|nosemgrep|eslint-disable[a-z-]*[[:space:]]+.*security|# noqa:[[:space:]]*S[0-9])
+why: An inline scanner suppression needs an owner, a reason, and an expiry in security/suppressions/ - not a comment that outlives the person who wrote it. Run /waivers. See security/policy.md.
+
+id: CORE-SECURITY-TODO
+severity: warn
+files: \.(js|jsx|ts|tsx|mjs|cjs|py|go|rs|cs|java|rb|php)$
+match: (TODO|FIXME|XXX|HACK)[^A-Za-z]*.*(auth|authz|permission|security|inject|sanitiz|csrf|xss)
+why: A security TODO is an accepted risk with no owner and no date. Fix it in this PR or record it in security/suppressions/ with an owner and an expiry. See security/policy.md.
+
+id: CORE-SECRET-IN-URL
+severity: block
+files: \.(js|jsx|ts|tsx|mjs|cjs|py|go|rs|cs|java|rb|php)$
+match: [?&](access_?token|api_?key|apikey|password|secret|jwt)=
+unless: (\$\{|%s|\{\}|<[A-Za-z_]+>|REDACTED|example)
+why: A credential in a query string is recorded in server logs, proxy logs, and the Referer header of every outbound link. Send it in a header or a body. See .claude/rules/security.md.
+
+id: CORE-WEAK-HASH
+severity: warn
+files: \.(js|jsx|ts|tsx|mjs|cjs|py|go|rs|cs|java|rb|php)$
+match: (hashlib\.(md5|sha1)|createHash\(['"](md5|sha1)|MD5\.Create|DigestUtils\.(md5|sha1)|crypto/md5|Md5::)
+why: MD5 and SHA-1 are broken for anything security-bearing - never for a password, a token, or a signature. Fine for a cache key or an etag; say which in a comment. See .claude/rules/security.md.
+
+id: CORE-XML-EXTERNAL-ENTITIES
+severity: warn
+files: \.(py|java|cs|rb|php)$
+match: (DocumentBuilderFactory|SAXParserFactory|XMLInputFactory)\.newInstance\(|xml\.(etree|dom|sax)|XmlTextReader\(
+why: An XML parser that resolves external entities reads local files and makes outbound requests on behalf of whoever supplied the document (XXE). Disable DTDs and external entities, or use a hardened parser. See .claude/rules/security.md.
+
+id: CORE-ARCHIVE-EXTRACT-ALL
+severity: warn
+files: \.(py|js|ts|java|cs|go|rb)$
+match: (extractall|extractAll|unzipSync|Untar)\(
+why: An archive entry named ../../etc/passwd writes outside the target directory (zip slip). Resolve each entry and confirm it stays under the destination before writing. See .claude/rules/security.md.
+
+id: CORE-CORS-WILDCARD-HEADER
+severity: warn
+files: \.(js|jsx|ts|tsx|mjs|cjs|py|go|rs|cs|java|rb|php|yml|yaml|conf)$
+match: Access-Control-Allow-Origin['"[:space:]:,=]+\*
+why: A wildcard origin is not a policy once anything is authenticated. Allowlist the origins you serve. See .claude/rules/api-contracts.md.
+
+id: CORE-WORKFLOW-INJECTION
+severity: block
+files: \.github/workflows/.*\.(yml|yaml)$|\.github/actions/.*\.(yml|yaml)$
+match: \$\{\{[[:space:]]*github\.(event\.(issue|pull_request|comment|review|discussion)\.(title|body)|event\.head_commit\.message|head_ref|event\.pull_request\.head\.ref)
+unless: ^[[:space:]]*[A-Z][A-Z0-9_]*:[[:space:]]*\$\{\{
+why: These are attacker-controlled text, and ${{ }} is substituted before the shell sees it - so a crafted PR title runs as code on the runner. Bind it to an uppercase env: name and read it as "$VAR", which is the form this rule allows. See .claude/rules/infra.md.
+
+id: CORE-WORKFLOW-PR-TARGET
+severity: block
+files: \.github/workflows/.*\.(yml|yaml)$
+match: ^[[:space:]]*pull_request_target[[:space:]]*:
+why: This runs with a write token and repository secrets against code from a fork. If it is genuinely needed, it must never check out the fork's head, and it needs a written justification. See .claude/rules/infra.md.
+
+id: CORE-WORKFLOW-CONTINUE-ON-ERROR
+severity: warn
+files: \.github/workflows/.*\.(yml|yaml)$
+match: continue-on-error[[:space:]]*:[[:space:]]*true
+why: On a test or security job this converts a gate into decoration - the run goes green whatever it found. See .claude/rules/infra.md.
+
+id: CORE-WORKFLOW-UNPINNED-ACTION
+severity: warn
+files: \.github/workflows/.*\.(yml|yaml)$
+match: uses:[[:space:]]*[A-Za-z0-9_.-]+/[A-Za-z0-9_./-]+@(main|master|v[0-9]+(\.[0-9]+)*)[[:space:]]*$
+unless: uses:[[:space:]]*(actions|github)/
+why: A tag can be moved to point at different code; a commit SHA cannot. Pin third-party actions to a full SHA. See .claude/rules/infra.md.
+
+id: CORE-CURL-PIPE-SHELL
+severity: block
+files: \.(sh|bash|zsh|yml|yaml|Dockerfile|mk|Makefile)$|Dockerfile|Makefile
+match: (curl|wget)[^|]*\|[[:space:]]*(sudo[[:space:]]+)?(ba|z)?sh
+why: Piping a download straight into a shell executes whatever the server returns, with no signature, no pin, and no chance to read it. Download to a file, verify a checksum, then run it. See .claude/rules/infra.md.
+
+id: CORE-CHMOD-WORLD-WRITABLE
+severity: warn
+files: \.(sh|yml|yaml|tf)$|Dockerfile
+match: chmod[[:space:]]+(-[A-Za-z]+[[:space:]]+)*[0-7]?[0-7]7[0-7]
+why: World-writable permissions. Grant the narrowest mode that works. See .claude/rules/infra.md.

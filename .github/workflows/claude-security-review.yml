@@ -1,0 +1,86 @@
+# Advisory security pass.
+#
+# TRUSTED PRs ONLY - same-repository branches. A fork's diff is attacker-controlled text
+# and this job holds an API key. Never pull_request_target, never a fork.
+#
+# This is the logic-flaw lens, not a scanner. security.yml already ran Semgrep and the
+# dependency scanners, and those are what gate. This finds what patterns cannot express:
+# the check that runs after the effect, the two safe steps that combine unsafely.
+
+name: Claude security review
+
+on:
+  pull_request:
+    types: [opened, synchronize]
+    paths:
+      - "**/auth/**"
+      - "**/middleware.ts"
+      - "**/actions.ts"
+      - "**/api/**"
+      - "**/db/**"
+      - "**/billing/**"
+      - "**/webhooks/**"
+      - "**/*.sql"
+      - "prisma/**"
+      - "migrations/**"
+      - "infra/**"
+      - "package-lock.json"
+
+permissions:
+  contents: read
+  pull-requests: write
+  id-token: write        # claude-code-action authenticates by OIDC
+
+concurrency:
+  group: claude-security-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  security-review:
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: anthropics/claude-code-action@v1
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          claude_args: "--max-turns 25"
+          prompt: |
+            Run the security-review skill over this pull request's diff.
+
+            You are ADVISORY. What blocks a merge is security/policy.md and the scanners in
+            security.yml. Never describe a finding as blocking or waived - that is a human
+            decision. Do not approve or request changes; comment only.
+
+            Read security/policy.md first, then .claude/rules/security.md, auth.md and
+            data-layer.md, plus any other file in .claude/rules/ covering the paths this
+            PR touches - list the directory rather than trusting the names above to be
+            the whole set. These are the rules the author wrote under; a security review
+            held to a narrower set finds the author compliant with rules they never had.
+
+            Re-rate every finding by consequence times reachability IN THIS CODEBASE.
+
+            Semgrep and the dependency scanners have already run. Do not repeat them. Look
+            for what they cannot express:
+              - order of operations - the authz check that runs after the write, the
+                validation that happens after the value was used
+              - trust boundaries - user input reaching a query, a path, a command, a URL;
+                follow the value the whole way, not to the first sanitizer
+              - state outliving the request - sessions, caches, tokens; who can still act
+                after they should not; what a cache key omits
+              - multi-step flows - reset, invitation, checkout, ownership transfer; what
+                happens when a step is repeated, skipped, or run concurrently with itself
+              - secrets reachable from client code
+
+            Report a finding only when you can state all three: who the attacker is, what
+            they control, and what they get. Without those it is a note, not a finding.
+
+            NEVER write a working exploit, in a comment or anywhere else. Describe the class
+            of problem and the path to it.
+
+            If the change is unremarkable, say so in one line and stop. Manufactured findings
+            train people to skip this review.

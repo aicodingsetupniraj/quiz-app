@@ -1,0 +1,38 @@
+# Pre-commit hooks.
+#
+# One job that matters above the rest: gitleaks. It catches a key before it is history,
+# which is the only genuinely cheap moment to catch one. Everything after that point
+# involves rotating a credential.
+#
+# Install once per clone:  pre-commit install
+#
+# CI runs the same scan, because a hook that was never installed protects nobody.
+
+repos:
+  - repo: https://github.com/gitleaks/gitleaks
+    rev: v8.21.2
+    hooks:
+      - id: gitleaks
+
+  # The third call site of the one rule set - the agent's hook checks the line, this
+  # checks the commit, CI checks the pull request. Same script, same patterns, so a
+  # finding here is the finding CI would have reported an hour later.
+  - repo: local
+    hooks:
+      - id: code-rules
+        name: Stack code rules
+        entry: bash security/check-code.sh --staged
+        language: system
+        pass_filenames: false
+
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: check-merge-conflict
+      - id: check-added-large-files
+        args: ["--maxkb=1024"]
+      - id: detect-private-key
+      - id: end-of-file-fixer
+      - id: trailing-whitespace
+      - id: check-yaml
+      - id: check-json

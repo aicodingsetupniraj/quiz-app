@@ -1,0 +1,9 @@
+{
+  "//": "Written by /setup-repo. Records which blueprint version this project scaffolded, so /sync-setup can tell an upstream change apart from a local edit. Do not hand-edit the version - re-run /sync-setup --apply instead. Local edits to the scaffolded files themselves are expected and are never overwritten silently.",
+  "//packs": "The rule packs this project took. This list is not documentation: security/check-code.sh reads it to decide which patterns to enforce, at write time and in CI. Adding a pack means running /setup-repo --pack <name> so the rules and the patterns arrive together. Valid: nextjs react angular vue node python dotnet java go rust.",
+  "blueprint": "agentic-coding-work-flows",
+  "plugin": "agentic-coding-setup",
+  "version": "0.17.1",
+  "installed": "2026-09-15",
+  "packs": ["core", "nextjs", "react", "node"]
+}

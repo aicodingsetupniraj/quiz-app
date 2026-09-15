@@ -1,0 +1,101 @@
+# Inline review comments on a PR.
+#
+# FORKS ARE SKIPPED, deliberately. The review agents are not hardened against prompt
+# injection: a fork's diff is attacker-controlled text, and this job holds credentials
+# and write access. That is the whole reason for the head-repo condition below - do not
+# relax it, and never move this to pull_request_target.
+#
+# Advisory. Claude comments; a human decides. Nothing here blocks a merge.
+
+name: Claude PR review
+
+on:
+  pull_request:
+    types: [opened, synchronize, ready_for_review]
+
+permissions:
+  contents: read
+  pull-requests: write
+  id-token: write        # claude-code-action authenticates by OIDC
+
+concurrency:
+  group: claude-review-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  review:
+    # Same-repository branches only - never a fork, for the reason at the top of this file.
+    #
+    # Drafts ARE reviewed when they open, because every PR this setup produces is a draft by
+    # design: /build-plan, /fix-issue and the @claude workflow all end in one. Excluding
+    # drafts meant the reviewer skipped exactly the PRs the system writes.
+    #
+    # But not on every push to a draft - that is work in progress, and re-reviewing each
+    # commit burns the budget on code the author is still changing. So: on open, and again
+    # when it is marked ready.
+    if: >-
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      (github.event.action != 'synchronize' || github.event.pull_request.draft == false)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      # The review agents live in the plugin, not in the repository. Without this step the
+      # runner has the rules files (they are checked in) but none of the lenses, so CI
+      # review is one generalist where local review is fourteen specialists. Install it and
+      # the two match.
+      #
+      # Non-blocking on purpose: if the marketplace is unreachable the review still runs
+      # against the rules files, which is the larger half of its value.
+      - name: Install the plugin so the review agents exist here
+        continue-on-error: true
+        run: |
+          npm install -g @anthropic-ai/claude-code
+          claude plugin marketplace add @REPLACE-ME-OWNER/@REPLACE-ME-REPO || true
+          claude plugin install agentic-coding-setup@@REPLACE-ME-REPO --scope user -y || true
+
+      - uses: anthropics/claude-code-action@v1
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          claude_args: "--max-turns 20"
+          prompt: |
+            Review the diff on this pull request. You are advisory - you comment, a human
+            decides. Nothing you say blocks the merge.
+
+            Dispatch the review agents by what the diff touches, not by judgement - a new
+            entry point gets authz-reviewer, a migration gets migration-reviewer, a workflow
+            change gets ci-workflow-reviewer, a lockfile gets dependency-auditor, a response
+            shape gets api-contract-reviewer. Several apply to one diff more often than not.
+            If the agents are not available in this environment, apply their rules yourself
+            from .claude/rules/ and say that you did.
+
+            Review against this repository's own rules, not against generic best practice.
+            The rules are the same ones the code was written under, and they are the whole
+            set, not a selection: read CLAUDE.md, then every file in .claude/rules/ that
+            bears on the paths this PR touches. Read .claude/rules/ by listing the
+            directory rather than from a list memorised here - a rule this file forgot to
+            name is still a rule the author was held to.
+
+            Where a finding traces to a rule, cite the file. A reviewer applying a
+            narrower set than the author was given is how convention drift enters.
+
+            Priority order:
+              1. Correctness - trace the data, including the empty, error, and concurrent
+                 cases. State a concrete failing input, never a category of concern.
+              2. Authorization - every new entry point is a new way in. Missing authz on a
+                 new entry point is the most serious thing you can find here.
+              3. Convention drift against the rules files above.
+              4. Missing tests - new behaviour without one, a fix without a regression test.
+              5. Dependencies - a lockfile change with no manifest change is a review item.
+
+            Rules:
+              - Read the whole changed file, not only the hunk. Most real bugs are in the
+                interaction between new lines and existing ones.
+              - Report only what you verified in the code. No speculation.
+              - Post inline comments on the specific lines. Keep each to a few sentences.
+              - Do not comment on formatting the linter already handles.
+              - If you found nothing worth raising, say exactly that in one line. An empty
+                review is a good result and much better than padding.

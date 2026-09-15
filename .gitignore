@@ -39,3 +39,9 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# agent setup - personal and local-only files
+CLAUDE.local.md
+.claude/settings.local.json
+.claude/audit/
+.claude/hooks.env

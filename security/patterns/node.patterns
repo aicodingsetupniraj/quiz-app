@@ -1,0 +1,80 @@
+# Node services. Rules: .claude/rules/node.md
+
+id: NODE-EXEC-INTERPOLATED
+severity: block
+files: \.(js|jsx|ts|tsx|mjs|cjs)$
+match: (^|[^A-Za-z0-9_.$])(exec|execSync)\([^)]*(`|\+[[:space:]]*[a-zA-Z_$]|\$\{)
+why: exec runs a shell, so an interpolated value is command injection. execFile or spawn with an argument array has no shell to inject into. See .claude/rules/node.md.
+
+id: NODE-EVAL
+severity: block
+files: \.(js|jsx|ts|tsx|mjs|cjs)$
+match: (^|[^A-Za-z_.$])(eval\(|new[[:space:]]+Function\()
+why: eval and new Function execute whatever produced the string. See .claude/rules/node.md.
+
+id: NODE-JWT-NO-ALGORITHMS
+severity: block
+files: \.(js|ts|mjs|cjs)$
+match: (jwt|jsonwebtoken)\.verify\(
+unless: algorithms
+why: jwt.verify without an algorithms allowlist accepts a token signed `none`, or one signed with your public key as an HMAC secret. Pass algorithms. See .claude/rules/node.md.
+
+id: NODE-JWT-ALG-NONE
+severity: block
+files: \.(js|jsx|ts|tsx|mjs|cjs)$
+match: algorithms?[[:space:]]*[:=][[:space:]]*(\[[[:space:]]*)?['"]none['"]
+why: The `none` algorithm means the signature is not checked at all. See .claude/rules/node.md.
+
+id: NODE-SPREAD-REQ-BODY
+severity: block
+files: \.(js|jsx|ts|tsx|mjs|cjs)$
+match: \.\.\.(req|request|ctx\.request)\.(body|query|params)
+why: Spreading a request body lets the caller set any field, including the one that decides ownership. Pick the fields explicitly. See .claude/rules/node.md.
+
+id: NODE-TLS-REJECT-OFF
+severity: block
+files: \.(js|jsx|ts|tsx|mjs|cjs)$
+match: (rejectUnauthorized[[:space:]]*:[[:space:]]*false|NODE_TLS_REJECT_UNAUTHORIZED[[:space:]]*=[[:space:]]*['"]?0)
+why: TLS verification disabled process-wide or per-request. Load the CA you need instead. See .claude/rules/node.md.
+
+id: NODE-SQL-TEMPLATE
+severity: block
+files: \.(js|jsx|ts|tsx|mjs|cjs)$
+match: (query|execute|raw)\([[:space:]]*`[^`]*\$\{
+why: A template literal into SQL is injection. Use parameter placeholders, or the driver's tagged-template helper. See .claude/rules/data-layer.md.
+
+id: NODE-SSRF-USER-URL
+severity: block
+files: \.(js|jsx|ts|tsx|mjs|cjs)$
+match: (fetch|axios(\.[a-z]+)?|got|request)\([[:space:]]*(req|request|ctx)\.(body|query|params)
+why: Fetching a URL the caller supplied is SSRF - the first thing found by it is the cloud metadata endpoint. Validate the host against an allowlist, not a blocklist, and do not follow redirects to a new host. See .claude/rules/node.md.
+
+id: NODE-TS-IGNORE
+severity: warn
+files: \.(ts|tsx|mts|cts)$
+match: @ts-ignore
+why: A bare @ts-ignore hides the next error on that line forever. Use @ts-expect-error with a reason, which fails once it is no longer needed. See .claude/rules/node/node-typescript.md.
+
+id: NODE-CORS-REFLECT
+severity: warn
+files: \.(js|jsx|ts|tsx|mjs|cjs)$
+match: origin[[:space:]]*:[[:space:]]*(true|['"]\*['"])
+why: Reflecting the request origin, or allowing all of them, is the same as having no CORS policy once credentials are involved. Allowlist. See .claude/rules/node.md.
+
+id: NODE-JWT-DECODE-AS-AUTH
+severity: warn
+files: \.(js|jsx|ts|tsx|mjs|cjs)$
+match: (jwt|jsonwebtoken)\.decode\(
+why: decode parses and verifies nothing. If this value decides access, it must come from verify. See .claude/rules/node.md.
+
+id: NODE-ERROR-TO-CLIENT
+severity: warn
+files: \.(js|jsx|ts|tsx|mjs|cjs)$
+match: res\.(send|json|status\([0-9]+\)\.(send|json))\([^)]*(err|error)(\.(stack|message))?[[:space:]]*\)
+why: Returning an error object to a client leaks stack traces, queries, and internal paths. Log it with a correlation id and return the id. See .claude/rules/observability.md.
+
+id: NODE-PATH-JOIN-INPUT
+severity: warn
+files: \.(js|jsx|ts|tsx|mjs|cjs)$
+match: path\.(join|resolve)\([^)]*(req|request)\.(body|query|params)
+why: A request-controlled path segment is traversal unless the resolved result is checked to still be under the base directory. Stripping ../ is not containment. See .claude/rules/node.md.

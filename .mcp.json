@@ -1,0 +1,16 @@
+{
+  "//": "Shared MCP servers. Committed, so every clone gets the same set. Values are ${ENV} references ONLY - never a literal token. A secret in this file is a secret in the repository. Remove any server the team does not actually use; each one is context the agent carries and a surface it can reach. The database and sentry servers from the template were removed: this app has no database and no error tracker (the PRD rules out third-party tracking).",
+  "mcpServers": {
+    "github": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-github"],
+      "env": {
+        "GITHUB_PERSONAL_ACCESS_TOKEN": "${GITHUB_TOKEN}"
+      }
+    },
+    "playwright": {
+      "command": "npx",
+      "args": ["-y", "@playwright/mcp@latest"]
+    }
+  }
+}

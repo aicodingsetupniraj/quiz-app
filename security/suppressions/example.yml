@@ -1,0 +1,14 @@
+# Example only. Delete this file once you have a real one.
+#
+# Every field is required. An entry missing an owner or an expiry is reported as
+# malformed by /waivers and does not count as an accepted risk - it counts as an
+# unreviewed one.
+
+- id: CVE-2024-00000
+  path: packages/api/package-lock.json
+  reason: >-
+    Vulnerable code path is the package's CLI entry point, which is not imported
+    anywhere in this repository. Verified by grepping for the module's exports.
+  owner: "@REPLACE-ME"
+  expires: 2026-01-15
+  ticket: https://github.com/REPLACE-ME/REPLACE-ME/issues/0

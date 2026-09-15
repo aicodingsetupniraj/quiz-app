@@ -1,0 +1,54 @@
+# Next.js App Router. Rules: .claude/rules/route-handlers.md, server-actions.md, caching.md
+#
+# The React and Node packs are loaded alongside this one - an App Router project is all
+# three - so the XSS, public-secret, and JWT rules are not repeated here.
+
+id: NEXT-SERVER-ACTION-NO-AUTH
+severity: warn
+files: (actions|route)\.(ts|js)$
+match: ^[[:space:]]*export[[:space:]]+(async[[:space:]]+function|const)[[:space:]]
+unless: (requireSession|requireUser|auth\(\)|getSession|getServerSession|withAuth|export[[:space:]]+const[[:space:]]+(dynamic|revalidate|runtime|metadata))
+why: A server action and a route handler are public HTTP endpoints - the component that calls one is not a control. Authenticate, validate, then authorize with the owner in the query. See .claude/rules/server-actions.md.
+
+id: NEXT-COOKIE-NOT-HTTPONLY
+severity: block
+files: \.(ts|tsx|js|jsx)$
+match: httpOnly[[:space:]]*:[[:space:]]*false
+why: A session cookie readable by JavaScript is readable by any XSS on the origin. See .claude/rules/route-handlers.md.
+
+id: NEXT-TRUST-FORWARDED-HEADER
+severity: warn
+files: \.(ts|tsx|js|jsx)$
+match: headers\(\)[^;]*(x-forwarded-for|x-real-ip|x-user|x-admin)
+why: A client-supplied header decides nothing about identity - it is spoofable by anyone who can reach the origin. Use the session. See .claude/rules/auth.md.
+
+id: NEXT-COOKIE-NOT-SECURE
+severity: block
+files: \.(ts|tsx|js|jsx)$
+match: secure[[:space:]]*:[[:space:]]*false
+unless: (process\.env\.NODE_ENV|isDev|development)
+why: A session cookie without Secure is sent over plain HTTP and is readable by anyone on the path. Gate it on the environment if you need it locally. See .claude/rules/nextjs/route-handlers.md.
+
+id: NEXT-OPEN-REDIRECT
+severity: block
+files: \.(ts|tsx|js|jsx)$
+match: (redirect|NextResponse\.redirect)\([^)]*(searchParams|nextUrl\.search|query\.(next|returnTo|redirect|url)|params\.(next|returnTo|redirect|url))
+why: A redirect target taken from the request is an open redirect - it puts your domain in front of a phishing page. Allow relative paths only: reject a scheme and a leading //. See .claude/rules/nextjs/middleware.md.
+
+id: NEXT-IMAGE-WILDCARD-HOST
+severity: block
+files: next\.config\.(js|mjs|ts)$
+match: (hostname|domains)[[:space:]]*:[[:space:]]*\[?[[:space:]]*['"](\*|\*\*)['"]
+why: A wildcard remote pattern turns the image optimizer into an open proxy that fetches any URL a caller supplies. Allowlist the hosts you serve images from. See .claude/rules/nextjs/env-and-config.md.
+
+id: NEXT-IGNORE-BUILD-CHECKS
+severity: warn
+files: next\.config\.(js|mjs|ts)$
+match: (ignoreBuildErrors|ignoreDuringBuilds)[[:space:]]*:[[:space:]]*true
+why: This turns the type check or the lint into decoration for every future change, not just this one. If it is deliberate it needs an owner and a date, not a config line. See .claude/rules/nextjs/env-and-config.md.
+
+id: NEXT-UNSTABLE-CACHE-NO-TAG
+severity: warn
+files: \.(ts|tsx)$
+match: (unstable_cache|revalidate)[[:space:]]*[:(=][[:space:]]*(false|Infinity)
+why: An unbounded cache on per-user data is how one user's page reaches another. Tag it and revalidate on write. See .claude/rules/caching.md.

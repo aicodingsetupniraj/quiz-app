@@ -1,0 +1,57 @@
+# Staging - fully automatic on merge to main.
+#
+# Automatic is the point: staging that requires a decision is staging nobody uses, and
+# then production is the first real environment a change meets.
+#
+# THE DEPLOY STEP IS A TODO. /setup-repo cannot fill it in - the platform differs per
+# project. Wire it to your platform and delete the placeholder.
+
+name: Deploy staging
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-staging
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment:
+      name: staging
+      url: ${{ vars.STAGING_URL }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      # Environment parity, without a container image, is made of exactly two things:
+      # the runtime version pinned in .nvmrc AND in the platform's own setting, and a
+      # committed lockfile installed frozen. Both, every time, or staging drifts.
+      - name: Install
+        run: npm ci
+
+      - name: Build
+        run: npm run build --if-present
+
+      - name: Deploy
+        run: |
+          echo "TODO: replace with the real deploy for this platform."
+          echo "Environment variables come from IaC, not from a dashboard - see infra/."
+          exit 1
+
+      - name: Smoke check
+        if: success()
+        run: |
+          test -n "${{ vars.STAGING_URL }}" || exit 0
+          curl --fail --silent --show-error --max-time 30 "${{ vars.STAGING_URL }}" > /dev/null

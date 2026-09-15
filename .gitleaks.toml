@@ -1,0 +1,43 @@
+# gitleaks - secret scanning.
+#
+# Runs in two places, and both matter:
+#   pre-commit  - catches a key before it is history, the only cheap moment
+#   CI          - catches what was committed without the hook installed
+#
+# Any finding blocks. There is no severity ladder for a committed credential.
+
+title = "Secret scanning"
+
+[extend]
+useDefault = true
+
+[[rules]]
+id = "generic-assigned-secret"
+description = "A long literal assigned to a secret-named variable"
+regex = '''(?i)(api[_-]?key|secret|passwd|password|token|credential|private[_-]?key|access[_-]?key|client[_-]?secret)["'`]?\s*[:=]\s*["'`][^"'`\s]{16,}["'`]'''
+tags = ["generic"]
+
+[[rules]]
+id = "internal-connection-string"
+description = "Database connection string with an inline password"
+regex = '''(?i)(postgres|postgresql|mysql|mongodb(\+srv)?|redis|amqp)://[^:\s/]+:[^@\s]{6,}@'''
+tags = ["database"]
+
+[allowlist]
+description = "Paths where a placeholder is the point"
+# Every entry here is a hole in the scan. Keep the list short, and keep it specific -
+# a broad path here silently disables scanning for everything added under it later.
+paths = [
+  '''(.*?)(package-lock\.json|pnpm-lock\.yaml|yarn\.lock|go\.sum|Cargo\.lock)$''',
+  '''(.*?)\.example$''',
+  '''(.*?)\.sample$''',
+  '''^\.env\.example$''',
+  '''(.*?)/__snapshots__/(.*?)''',
+]
+regexes = [
+  '''CHANGEME''',
+  '''your[_-](api[_-])?key[_-]here''',
+  '''xxxxxxxx''',
+  '''EXAMPLE_KEY''',
+  '''AKIAIOSFODNN7EXAMPLE''',
+]
