@@ -1,7 +1,7 @@
 ---
 id: "002"
 title: A kid opens a topic and reads its fun facts before starting
-status: todo
+status: done
 milestone: M1
 requirements: [R-5.5.2, R-5.1.3, R-6.1]
 depends_on: ["001"]
@@ -25,11 +25,11 @@ Tapping a topic opens its intro page with the fun facts and a big "Start Quiz" b
 
 *Authored by the planner.*
 
-- [ ] `/topics/space` shows the icon, title, difficulty, description and all 4 fun facts from the content file (Playwright)
-- [ ] "Start Quiz" goes to `/topics/space/quiz` and can be activated by keyboard (Playwright)
-- [ ] All 6 topic pages are pre-rendered: `next build` lists them as static via `generateStaticParams`
-- [ ] Loading `/topics/not-a-topic` **directly by URL** shows the not-found page, not an error (Playwright)
-- [ ] A back link returns to `/` (Playwright)
+- [x] `/topics/space` shows the icon, title, difficulty, description and all 4 fun facts from the content file (Playwright)
+- [x] "Start Quiz" goes to `/topics/space/quiz` and can be activated by keyboard (Playwright)
+- [x] All 6 topic pages are pre-rendered: `next build` lists them as static via `generateStaticParams`
+- [x] Loading `/topics/not-a-topic` **directly by URL** shows the not-found page, not an error (Playwright)
+- [x] A back link returns to `/` (Playwright)
 
 ## Notes
 

@@ -1,12 +1,6 @@
 import Link from "next/link";
-import type { Difficulty, Topic } from "@/content";
-
-// Full class strings, not built from the difficulty name, so Tailwind's scanner finds them.
-const difficultyStyles: Record<Difficulty, string> = {
-  Easy: "bg-emerald-100 text-emerald-900",
-  Medium: "bg-amber-100 text-amber-900",
-  Hard: "bg-rose-100 text-rose-900",
-};
+import type { Topic } from "@/content";
+import { DifficultyBadge } from "./difficulty-badge";
 
 type TopicCardProps = Pick<Topic, "id" | "title" | "icon" | "description" | "difficulty">;
 
@@ -21,11 +15,7 @@ export function TopicCard({ id, title, icon, description, difficulty }: TopicCar
       </span>
       <h2 className="text-2xl font-bold text-slate-900">{title}</h2>
       <p className="text-lg text-slate-700">{description}</p>
-      <span
-        className={`mt-auto self-start rounded-full px-3 py-1 text-base font-semibold ${difficultyStyles[difficulty]}`}
-      >
-        {difficulty}
-      </span>
+      <DifficultyBadge difficulty={difficulty} className="mt-auto self-start" />
     </Link>
   );
 }

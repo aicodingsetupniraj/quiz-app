@@ -3,6 +3,7 @@
 // it in place avoids a second copy that would drift.
 import raw from "../../docs/topics-data.json";
 import { parseContent } from "./parse";
+import type { Topic } from "./types";
 
 const content = parseContent(raw);
 
@@ -11,5 +12,10 @@ export const contentVersion = content.version;
 export const quizConfig = content.quizConfig;
 export const topics = content.topics;
 export const badges = content.badges;
+
+/** The topic with exactly this id, or undefined. Compares ids, so "__proto__" and friends can't match. */
+export function getTopic(id: string): Topic | undefined {
+  return topics.find((topic) => topic.id === id);
+}
 
 export type { Badge, Content, Difficulty, Question, QuizConfig, Topic } from "./types";

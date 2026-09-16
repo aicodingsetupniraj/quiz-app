@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { badges, contentVersion, quizConfig, topics } from "./index";
+import { badges, contentVersion, getTopic, quizConfig, topics } from "./index";
 
 // Checks the real docs/topics-data.json. A content edit that breaks any of these fails CI.
 
@@ -48,4 +48,18 @@ describe.each(topics.map((t) => [t.id, t] as const))("topic %s", (_id, topic) =>
     expect(q.correctIndex).toBeLessThan(q.options.length);
     expect(q.explanation.trim()).not.toBe("");
   });
+});
+
+describe("getTopic", () => {
+  it("returns the topic with that id", () => {
+    expect(getTopic("space")?.title).toBe("Space");
+    expect(getTopic("simple-machines")?.id).toBe("simple-machines");
+  });
+
+  it.each(["not-a-topic", "", "Space", "constructor", "__proto__"])(
+    "returns undefined for %j",
+    (id) => {
+      expect(getTopic(id)).toBeUndefined();
+    },
+  );
 });
