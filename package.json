@@ -19,7 +19,7 @@
     "@axe-core/playwright": "^4.13.0",
     "@playwright/test": "1.63.0",
     "@tailwindcss/postcss": "^4",
-    "@types/node": "^24.13.4",
+    "@types/node": "^24.13.5",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "eslint": "^9.39.5",
